@@ -25,6 +25,12 @@ function Cell({ cellId, onClaim }) {
       data-cell-id={cellId}
       aria-label={cell ? `Cell ${cellId}, owned by ${cell.ownerName}` : `Unclaimed cell ${cellId}`}
       title={cell ? `Cell ${cellId} · ${cell.ownerName}${locked ? " · locked" : ""}` : `Cell ${cellId} · unclaimed`}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClaim(cellId);
+        }
+      }}
       className={classes}
       style={{ width: "min(1.7vw, 16px)", backgroundColor: cell?.color }}
     >

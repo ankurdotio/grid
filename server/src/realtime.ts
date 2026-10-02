@@ -56,8 +56,30 @@ export function attachRealtime(server: ReturnType<typeof createServer>): void {
       clients.delete(socket);
       if (state.userId) broadcastOnline();
     });
-    socket.on("message", async (raw) => {
-      try {
+    const authentication = (async () => {
+      // Browsers cannot set WebSocket headers, so the token is sent in the query string.
+      const token = new URL(request.url ?? "/", "http://localhost").searchParams.get("token");
+      const userId = token ? await commands.hget(KEYS.tokens, token) : null;
+      if (!userId) {
+        socket.close(4001, "Invalid token");
+        return false;
+      }
+      const user = parseUser(await commands.hget(KEYS.users, userId));
+      state.userId = userId;
+      state.name = user.name;
+      state.color = user.color;
+      broadcastOnline();
+      return true;
+    })().catch((error: unknown) => {
+      console.error("Could not authenticate WebSocket:", error);
+      socket.close(1011, "Authentication failed");
+      return false;
+    });
+    let messageQueue = Promise.resolve();
+    socket.on("message", (raw) => {
+      messageQueue = messageQueue.then(async () => {
+        if (!(await authentication)) return;
+        try {
         if (!state.userId || !state.name || !state.color) return;
         let message: unknown;
         try {
@@ -113,22 +135,10 @@ export function attachRealtime(server: ReturnType<typeof createServer>): void {
             console.error("Could not publish leaderboard:", error);
           }
         }, 1000);
-      } catch (error) {
-        console.error("Could not handle WebSocket message:", error);
-      }
-    });
-
-
-    void (async () => {
-      // Browsers cannot set WebSocket headers, so the token is sent in the query string.
-      const token = new URL(request.url ?? "/", "http://localhost").searchParams.get("token");
-      const userId = token ? await commands.hget(KEYS.tokens, token) : null;
-      if (!userId) { socket.close(4001, "Invalid token"); return; }
-      const user = parseUser(await commands.hget(KEYS.users, userId));
-      state.userId = userId; state.name = user.name; state.color = user.color;
-      broadcastOnline();
-    })().catch((error: unknown) => {
-      console.error("Could not authenticate WebSocket:", error); socket.close(1011, "Authentication failed");
+        } catch (error) {
+          console.error("Could not handle WebSocket message:", error);
+        }
+      });
     });
   });
 

@@ -8,6 +8,8 @@ import routes from "./routes.js";
 import { attachRealtime } from "./realtime.js";
 
 const app = express();
+// Trust the single Kubernetes ingress hop so IP rate limits use the client address.
+app.set("trust proxy", 1);
 app.use(express.json());
 app.use("/api", routes);
 if (STATIC_DIR) app.use(express.static(STATIC_DIR));

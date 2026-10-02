@@ -78,7 +78,7 @@ export default function Grid() {
           }}
         >
           {Array.from({ length: gridSize * gridSize }, (_, cellId) => (
-            <Cell key={cellId} cellId={cellId} />
+            <Cell key={cellId} cellId={cellId} onClaim={claim} />
           ))}
         </div>
       </div>

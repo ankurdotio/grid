@@ -1,4 +1,4 @@
-import { getGrid } from "./api.js";
+import { getGrid, getLeaderboard } from "./api.js";
 import {
   cellUpdated,
   connectionChanged,
@@ -19,6 +19,7 @@ let reconnectTimer;
 let pendingTimers = new Map();
 let retryDelay = 1000;
 let stopped = true;
+let clockOffset = 0;
 function clearPendingTimer(cellId) {
   const timer = pendingTimers.get(cellId);
   if (timer) clearTimeout(timer);
@@ -36,7 +37,7 @@ function handleClaimResult(message, dispatch) {
     showEffect(dispatch, message.cellId, "pop");
   } else if (message.reason === "locked") {
     showEffect(dispatch, message.cellId, "shake");
-    const seconds = Math.max(0, Math.ceil((message.lockedUntil - Date.now()) / 1000));
+    const seconds = Math.max(0, Math.ceil((message.lockedUntil - (Date.now() + clockOffset)) / 1000));
     dispatch(toastShown(`Locked by ${message.ownerName ?? "another player"} for ${seconds}s`));
   } else if (message.reason === "rate_limited") {
     dispatch(toastShown("Slow down!"));
@@ -61,9 +62,11 @@ function connect(token, dispatch) {
     syncing = true;
     queuedCells = [];
     try {
-      const grid = await getGrid();
+      const [grid, leaderboard] = await Promise.all([getGrid(), getLeaderboard()]);
       if (activeSocket !== socket || stopped) return;
       dispatch(gridLoaded(grid));
+      clockOffset = grid.serverTime - Date.now();
+      dispatch(leaderboardLoaded(leaderboard));
       for (const cell of queuedCells) dispatch(cellUpdated(cell));
       queuedCells = [];
       syncing = false;
